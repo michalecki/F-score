@@ -1,7 +1,7 @@
-import tabula
+import tabula #to read in tables from pdf
 #import pandas as pd
-from PyPDF4 import PdfFileReader
-import os
+# from PyPDF4 import PdfFileReader
+import os #to acces file list in the folder
 
 
 def f_score(file, year=2019):
@@ -11,18 +11,22 @@ def f_score(file, year=2019):
     https://en.wikipedia.org/wiki/Piotroski_F-score
     :param file: pdf
     :param year: by default year prior to the investment, can calculate past years
-    :return: name of the company, P/B, F-score
+    :return: P/B, F-score
     '''
 
+    if file.split('.')[-1] != 'pdf':
+        return print('only pdf please')
+    #gets tables from the first 4 pages of the document
     data = tabula.read_pdf(file, stream=True, pages=[1, 2, 3, 4], multiple_tables=True)
 
+    #maps the year to the column in the tables
     if year == 2019: y = 8
     else: y = 8 - (2019 - year)
 
-    # the file headers are not consistent, using filename instead
+    # the file headers are not consistent, using filename in the looping function instead
     # title = PdfFileReader(file).getDocumentInfo().title
-    title = file.split('.')[0]
 
+    #assigns names to the tables for clarity
     summary = data[0]
 
     income_statement = data[1]
@@ -31,7 +35,7 @@ def f_score(file, year=2019):
 
     cash_flow = data[3]
 
-    # table checks
+    # table checks if retrieving correct data
     if summary.iat[0,3] != str(year): print('Check Summary table and years')
     if cash_flow.iat[0, 8] != str(year): print('Check Cash Flow table and years')
     if balance_sheet.iat[0, 8] != str(year): print('Check Balance Sheet table and years')
@@ -50,6 +54,7 @@ def f_score(file, year=2019):
         P_B = summary.iat[11,y-5]
     except: P_B = 'Year out of available range (P/B)'
 
+    #calculating the f-score parameter
     F_SCORE = 0
 
     # net income/total assets
@@ -104,45 +109,53 @@ def f_score(file, year=2019):
     EQ = int(cash_flow.iat[19,y].replace(',', ''))
     if EQ <= 0: F_SCORE += 1
 
+    #a parameter for testing
     # test = ROA + d_ROA + d_TURN + d_LEVER + d_LIQUID + d_MARGIN + CFO + ACCRUAL
 
-    return title, P_B, F_SCORE
+    return P_B, F_SCORE
 
 
 def folder_loop(dir):
     '''
-
-    :param dir:
-    :return:
+    Helper function to loop through the files in a folder and calculate parameters for the files that don't have
+    the calculation done yet
+    :param dir: str, directory where the files are
+    :return: text file with data: file name, output of f_score
     '''
+    #makes a list of the files in the directory
     files = os.listdir(dir)
     titles = list()
 
+    #strips the file name from extension
     for file in files:
-        titles.append(file.split('.')[0])
+        if file.split('.')[-1] == 'pdf':
+            titles.append(file.split('.')[0])
+
+    #makes the parameter file or opens it for reading and appending
     try:
         fh = open("parameters.txt", "r+")
     except FileNotFoundError:
         fh = open("parameters.txt", "w")
-        fh.write("Name, P/B, F-score\n")
-    calculated = list()
+        fh.write("Name, (P/B, F-score)\n")
 
+    #reads in the file contents
+    calculated = list()
     try:
         for line in fh:
             calculated.append(line.rstrip())
     except:
         pass
 
+    #calculates parameter and adds to the file if the filename in not in the file yet
     for title in titles:
-        # if file.startswith('.'): continue
         if title not in calculated:
             fh.write(f"{title}{f_score(dir+'/'+title+'.pdf')} \n")
 
     fh.close()
 
+#example use
+#will read files in the ./samples folder
+#will write the "parameters.txt" file into the current directory
 folder_loop('samples')
 
 
-#todo:
-# remove double name printing
-# add documentation
